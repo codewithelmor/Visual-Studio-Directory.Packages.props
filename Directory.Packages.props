@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  =====================================================================================
+  Directory.Packages.props : SAMPLE covering every Central Package Management option
+  =====================================================================================
+
+  WHERE TO PUT IT
+    At the repository root (next to the .sln or .slnx). MSBuild walks UP from each project
+    and uses the NEAREST Directory.Packages.props. Only one file is used per project.
+    Files are NOT merged automatically (see section 10 for the Import pattern).
+
+  NOTES
+    * Package names and versions below are ILLUSTRATIVE. Pick the versions you actually need.
+    * XML comments cannot contain two consecutive hyphens, so none are used in this file.
+    * Not every entry should be kept in a real repo. Delete what you don't use.
+-->
+<Project>
+
+  <!-- ===================================================================================
+       1. CPM SWITCHES (MSBuild properties)
+       =================================================================================== -->
+  <PropertyGroup>
+
+    <!--
+      MASTER SWITCH. Turns Central Package Management on for every project below this file.
+      Once true:
+        * PackageReference items in .csproj files must NOT have a Version attribute (NU1008).
+        * Every PackageReference needs a matching PackageVersion here (NU1010).
+      A single project can opt out by setting this to false in its own .csproj.
+    -->
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+
+    <!--
+      Allow a project to override the central version with VersionOverride on its
+      PackageReference. Default is true. Set to false to forbid overrides repo wide
+      (strict uniformity; any VersionOverride then fails the restore).
+    -->
+    <CentralPackageVersionOverrideEnabled>true</CentralPackageVersionOverrideEnabled>
+
+    <!--
+      Transitive pinning. When true, a PackageVersion entry also controls the version of
+      that package when it only arrives as a TRANSITIVE dependency. Use it to force a patched
+      version of an indirect package (security fixes) without referencing it from any project.
+      Default is false.
+    -->
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+
+    <!--
+      Allow floating versions (for example 3.* or 1.0.0-*) inside PackageVersion.
+      Default is false and floating versions then fail with NU1011.
+      Floating versions make builds non deterministic, so leave this off unless you have a
+      concrete reason (for example an internal feed that always wants the latest 3.x).
+    -->
+    <CentralPackageFloatingVersionsEnabled>false</CentralPackageFloatingVersionsEnabled>
+
+  </PropertyGroup>
+
+
+  <!-- ===================================================================================
+       2. RELATED RESTORE AND SECURITY SETTINGS (not CPM itself, but commonly kept here)
+       =================================================================================== -->
+  <PropertyGroup>
+
+    <!-- NuGet Audit: report known vulnerabilities in direct and transitive packages. -->
+    <NuGetAudit>true</NuGetAudit>
+    <!-- all = direct and transitive. direct = only packages you reference. -->
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <!-- Lowest severity to report: low, moderate, high, critical. -->
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+    <!-- Optional: turn vulnerability warnings into errors on CI. -->
+    <!-- <WarningsAsErrors>$(WarningsAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsAsErrors> -->
+
+    <!--
+      Optional: lock files for reproducible restores. Each project then gets a
+      packages.lock.json. With RestoreLockedMode true (usually only on CI), restore fails if
+      the resolved graph differs from the lock file.
+    -->
+    <!-- <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile> -->
+    <!-- <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode> -->
+
+  </PropertyGroup>
+
+
+  <!-- ===================================================================================
+       3. VERSION PROPERTIES FOR PACKAGE FAMILIES
+       Packages that must move together share one property, so an upgrade is a one line edit.
+       =================================================================================== -->
+  <PropertyGroup>
+    <MicrosoftExtensionsVersion>10.0.0</MicrosoftExtensionsVersion>
+    <EfCoreVersion>10.0.0</EfCoreVersion>
+    <AzureFunctionsWorkerVersion>2.0.0</AzureFunctionsWorkerVersion>
+  </PropertyGroup>
+
+
+  <!-- ===================================================================================
+       4. GlobalPackageReference
+       Added automatically to EVERY project that imports this file. No .csproj edits needed.
+         * Version goes ON this item.
+         * Do NOT also declare a PackageVersion for the same package id.
+         * Use PrivateAssets="all" so analyzers and build tools never flow to consumers
+           of your own NuGet packages.
+       =================================================================================== -->
+  <ItemGroup Label="Global: analyzers and build tools">
+    <!-- Style and static analysis rules applied solution wide. -->
+    <GlobalPackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.556" PrivateAssets="all" />
+    <GlobalPackageReference Include="Meziantou.Analyzer" Version="2.0.180" PrivateAssets="all" />
+
+    <!-- Git based version stamping for every assembly. -->
+    <GlobalPackageReference Include="Nerdbank.GitVersioning" Version="3.6.143" PrivateAssets="all" />
+
+    <!--
+      IncludeAssets or ExcludeAssets can be used to control what is consumed, for example:
+      IncludeAssets="runtime; build; native; contentfiles; analyzers"
+    -->
+  </ItemGroup>
+
+
+  <!-- ===================================================================================
+       5. PackageVersion: the core entries (one per package, unconditional)
+       Referenced from a .csproj as:  <PackageReference Include="Package.Id" />
+       =================================================================================== -->
+  <ItemGroup Label="General libraries">
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageVersion Include="Serilog" Version="4.2.0" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageVersion Include="Polly" Version="8.5.0" />
+    <PackageVersion Include="FluentValidation" Version="11.11.0" />
+    <PackageVersion Include="CsvHelper" Version="33.0.1" />
+  </ItemGroup>
+
+  <!-- Version syntax examples. NuGet interprets these as documented in the NuGet versioning rules. -->
+  <ItemGroup Label="Version syntax examples">
+    <!-- Plain version: means 1.2.3 or higher. NuGet resolves the lowest applicable version. -->
+    <PackageVersion Include="Example.Minimum" Version="1.2.3" />
+    <!-- Exact version: only 1.2.3 is acceptable. -->
+    <PackageVersion Include="Example.Exact" Version="[1.2.3]" />
+    <!-- Range: at least 1.0.0 and below 2.0.0. -->
+    <PackageVersion Include="Example.Range" Version="[1.0.0,2.0.0)" />
+    <!-- Prerelease: spelled out like any other version. -->
+    <PackageVersion Include="Example.Preview" Version="2.0.0-preview.3" />
+  </ItemGroup>
+
+
+  <!-- ===================================================================================
+       6. PackageVersion using shared version properties (package families)
+       =================================================================================== -->
+  <ItemGroup Label="Microsoft.Extensions family">
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="$(MicrosoftExtensionsVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="$(MicrosoftExtensionsVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="$(MicrosoftExtensionsVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="$(MicrosoftExtensionsVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="$(MicrosoftExtensionsVersion)" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="$(MicrosoftExtensionsVersion)" />
+  </ItemGroup>
+
+  <ItemGroup Label="Azure Functions (isolated worker)">
+    <PackageVersion Include="Microsoft.Azure.Functions.Worker" Version="$(AzureFunctionsWorkerVersion)" />
+    <PackageVersion Include="Microsoft.Azure.Functions.Worker.Sdk" Version="$(AzureFunctionsWorkerVersion)" />
+    <PackageVersion Include="Microsoft.Azure.Functions.Worker.Extensions.Http" Version="3.2.0" />
+    <PackageVersion Include="Microsoft.Azure.Functions.Worker.Extensions.ServiceBus" Version="5.22.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Azure SDK">
+    <PackageVersion Include="Azure.Identity" Version="1.13.1" />
+    <PackageVersion Include="Azure.Storage.Blobs" Version="12.23.0" />
+    <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.7.0" />
+  </ItemGroup>
+
+
+  <!-- ===================================================================================
+       7. CONDITIONAL VERSIONS BY TARGET FRAMEWORK (multi targeting)
+       This file is evaluated per project and per target framework, so $(TargetFramework)
+       from the project body is available in conditions.
+       Make sure every TFM you build has a matching entry, or a fallback entry.
+       =================================================================================== -->
+  <ItemGroup Label="EF Core: net8.0" Condition="'$(TargetFramework)' == 'net8.0'">
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="8.0.11" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.11" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11" />
+  </ItemGroup>
+
+  <ItemGroup Label="EF Core: net10.0" Condition="'$(TargetFramework)' == 'net10.0'">
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="$(EfCoreVersion)" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="$(EfCoreVersion)" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="$(EfCoreVersion)" />
+  </ItemGroup>
+
+  <!-- A condition can also sit on a single PackageVersion. -->
+  <ItemGroup>
+    <PackageVersion Include="System.Text.Json" Version="8.0.5" Condition="'$(TargetFramework)' == 'netstandard2.0'" />
+  </ItemGroup>
+
+
+  <!-- ===================================================================================
+       8. CONDITIONAL VERSIONS BY PROJECT (name or custom property)
+       Useful for test projects, or any group of projects selected by a naming convention.
+       $(MSBuildProjectName) is always available. Custom properties must be defined in the
+       project body or in a Directory.Build.props that is imported before this file.
+       =================================================================================== -->
+  <ItemGroup Label="Testing" Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageVersion Include="xunit" Version="2.9.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageVersion Include="Moq" Version="4.20.72" />
+    <PackageVersion Include="FluentAssertions" Version="6.12.2" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.2" />
+  </ItemGroup>
+
+
+  <!-- ===================================================================================
+       9. TRANSITIVE PINNING ENTRIES
+       These packages may not be referenced by any project. Because
+       CentralPackageTransitivePinningEnabled is true, the version below is applied wherever
+       the package appears in the dependency graph.
+       Typical use: force a patched version of an indirect, vulnerable package.
+       Add a comment with the advisory id and a note on when to remove the pin.
+       =================================================================================== -->
+  <!--
+    Example pattern (replace with a real advisory and a real patched version):
+
+    <ItemGroup Label="Transitive pins (security)">
+      GHSA-xxxx-xxxx-xxxx: Some.Indirect.Package fixed in 2.3.1. Remove once Parent.Package
+      depends on a patched version.
+      <PackageVersion Include="Some.Indirect.Package" Version="2.3.1" />
+    </ItemGroup>
+
+    Be careful pinning packages that ship inside the .NET runtime (System.* on modern TFMs).
+    Pinning those can cause downgrade errors (NU1605) or conflicts.
+  -->
+
+
+  <!-- ===================================================================================
+       10. FLOATING VERSIONS (only valid when CentralPackageFloatingVersionsEnabled is true)
+       Left commented out because floating versions make builds non deterministic.
+       =================================================================================== -->
+  <!--
+  <ItemGroup>
+    <PackageVersion Include="Contoso.Internal.Sdk" Version="3.*" />
+    <PackageVersion Include="Contoso.Internal.Tools" Version="2.1.0-*" />
+  </ItemGroup>
+  -->
+
+
+  <!-- ===================================================================================
+       11. NESTED FILES AND INHERITANCE (commented pattern)
+       Only the nearest Directory.Packages.props is used. If a subfolder needs its own file
+       but should still inherit the repo wide versions, put this at the top of the CHILD file:
+
+         <Project>
+           <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Packages.props', '$(MSBuildThisFileDirectory)../'))" />
+
+           <ItemGroup>
+             Update modifies an entry the parent already declared:
+             <PackageVersion Update="Newtonsoft.Json" Version="12.0.3" />
+             Include adds an entry that only this subtree needs:
+             <PackageVersion Include="Legacy.Only.Package" Version="1.0.0" />
+           </ItemGroup>
+         </Project>
+       =================================================================================== -->
+
+</Project>
+
+<!--
+  =====================================================================================
+  HOW PROJECT FILES LOOK WITH THIS FILE IN PLACE
+  =====================================================================================
+
+  1) Normal use (no version in the project):
+
+       <ItemGroup>
+         <PackageReference Include="Newtonsoft.Json" />
+         <PackageReference Include="Serilog" />
+         <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+       </ItemGroup>
+
+  2) Asset metadata stays in the project (only Version moved):
+
+       <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+         <PrivateAssets>all</PrivateAssets>
+         <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+       </PackageReference>
+
+  3) Per project exception (needs CentralPackageVersionOverrideEnabled true):
+
+       <PackageReference Include="Newtonsoft.Json" VersionOverride="12.0.3" />
+
+  4) Project that opts out of CPM entirely:
+
+       <PropertyGroup>
+         <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+       </PropertyGroup>
+       <ItemGroup>
+         <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+       </ItemGroup>
+
+  5) Do NOT do any of these:
+
+       <PackageReference Include="Serilog" Version="4.2.0" />     NU1008: Version not allowed
+       <PackageReference Include="Not.In.Central.File" />          NU1010: no PackageVersion found
+       Both a GlobalPackageReference and a PackageVersion for one id: pick one.
+
+  ADDITIONAL TIPS
+    * Pair with a nuget.config that uses package source mapping to avoid warning NU1507
+      when more than one feed is configured.
+    * dotnet add package Foo   (with CPM enabled) edits THIS file and adds a version-less
+      PackageReference to the project.
+-->
